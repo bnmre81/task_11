@@ -59,37 +59,43 @@ def restaurant_detail(request, restaurant_id):
     return render(request, 'detail.html', context)
 
 def restaurant_create(request):
-    form = RestaurantForm()
-    if request.method == "POST":
-        form = RestaurantForm(request.POST, request.FILES)
-        if form.is_valid():
-            restaurant = form.save(commit=False)
-            restaurant.owner = request.user
-            restaurant.save()
-            return redirect('restaurant-list')
-    context = {
-        "form":form,
-    }
-    return render(request, 'create.html', context)
+    if request.user.is_authenticated:
+        form = RestaurantForm()
+        if request.method == "POST":
+            form = RestaurantForm(request.POST, request.FILES)
+            if form.is_valid():
+                restaurant = form.save(commit=False)
+                restaurant.owner = request.user
+                restaurant.save()
+                return redirect('restaurant-list')
+        context = {
+            "form":form,
+        }
+        return render(request, 'create.html', context)
+    return redirect('signin')
 
 def item_create(request, restaurant_id):
     form = ItemForm()
-    restaurant = Restaurant.objects.get(id=restaurant_id)
+    restaurant_obj = Restaurant.objects.get(id=restaurant_id)
+    if not request.user.is_staff and request.user != restaurant_obj.owner:
+        return redirect("access-denied")
     if request.method == "POST":
         form = ItemForm(request.POST)
         if form.is_valid():
             item = form.save(commit=False)
-            item.restaurant = restaurant
+            item.restaurant = restaurant_obj
             item.save()
             return redirect('restaurant-detail', restaurant_id)
     context = {
         "form":form,
-        "restaurant": restaurant,
+        "restaurant": restaurant_obj,
     }
     return render(request, 'item_create.html', context)
 
 def restaurant_update(request, restaurant_id):
     restaurant_obj = Restaurant.objects.get(id=restaurant_id)
+    if not request.user.is_staff and request.user != restaurant_obj.owner:
+        return redirect("access-denied")
     form = RestaurantForm(instance=restaurant_obj)
     if request.method == "POST":
         form = RestaurantForm(request.POST, request.FILES, instance=restaurant_obj)
@@ -103,6 +109,15 @@ def restaurant_update(request, restaurant_id):
     return render(request, 'update.html', context)
 
 def restaurant_delete(request, restaurant_id):
+    if not request.user.is_staff:
+        return redirect("access-denied")
     restaurant_obj = Restaurant.objects.get(id=restaurant_id)
     restaurant_obj.delete()
     return redirect('restaurant-list')
+
+def access_denied(request):
+    return render(request, 'access_denied.html')
+
+
+
+
